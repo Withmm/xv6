@@ -327,7 +327,7 @@ uint64 sys_open(void)
 				iunlockput(ip);
 				end_op();
 				return -1;
-			}	
+			}
 			char tmp_path[MAXPATH] = {0};
 			if (readi(ip, 0, (uint64)tmp_path, 0, MAXPATH) < 0) {
 				iunlockput(ip);
@@ -339,7 +339,7 @@ uint64 sys_open(void)
 				end_op();
 				return -1;
 			}
-			
+
 			ilock(ip);
 		}
 	}
@@ -372,7 +372,7 @@ uint64 sys_open(void)
 	if ((omode & O_TRUNC) && ip->type == T_FILE) {
 		itrunc(ip);
 	}
-	
+
 	iunlock(ip);
 	end_op();
 
@@ -520,16 +520,16 @@ uint64 sys_symlink(void)
 		return -1;
 	}
 	begin_op();
-	struct inode *ip;	
+	struct inode *ip;
 	if ((ip = create(sym_path, T_SYMLINK, 0, 0)) == 0) {
 		end_op();
 		return -1;
 	}
 	if (writei(ip, 0, (uint64)target_path, 0,  MAXPATH) < 0) {
 		end_op();
-		return -1;			
+		return -1;
 	}
-	iunlockput(ip);	
+	iunlockput(ip);
 	end_op();
 	return 0;
 }

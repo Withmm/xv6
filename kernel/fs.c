@@ -287,7 +287,7 @@ void ilock(struct inode *ip)
 
 	if (ip == 0 || ip->ref < 1)
 		panic("ilock");
-	
+
 	acquiresleep(&ip->lock);
 
 	if (ip->valid == 0) {
@@ -407,7 +407,7 @@ static uint bmap(struct inode *ip, uint bn)
 				return 0;
 			ip->addrs[NDIRECT + 1] = addr;
 		}
-		
+
 		uint index = bn % 256;
 		bn /= 256;
 
@@ -415,7 +415,7 @@ static uint bmap(struct inode *ip, uint bn)
 		a = (uint *)bp->data;
 		if ((addr = a[bn]) == 0) {
 			addr = balloc(ip->dev);
-			if (addr) {	
+			if (addr) {
 				a[bn] = addr;
 				log_write(bp);
 			}
@@ -432,7 +432,7 @@ static uint bmap(struct inode *ip, uint bn)
 		}
 		brelse(bp);
 		return addr;
-		
+
 	}
 
 	panic("bmap: out of range");
@@ -470,13 +470,13 @@ void itrunc(struct inode *ip)
 		for (j = 0; j < 256; j++) {
 			struct buf *bp2;
 			if (a[j]) {
-				bp2 = bread(ip->dev, a[j]);	
+				bp2 = bread(ip->dev, a[j]);
 				b = (uint *)bp2->data;
 				for (int k = 0; k < 256; k++) {
 					if (b[k])
 						bfree(ip->dev, b[k]);
 				}
-				brelse(bp2);	
+				brelse(bp2);
 				bfree(ip->dev, a[j]);
 				a[j] = 0;
 			}
