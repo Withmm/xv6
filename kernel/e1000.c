@@ -102,7 +102,26 @@ e1000_transmit(char *buf, int len)
   // a pointer so that it can be freed after send completes.
   //
 
-  
+	//acquire(&e1000_lock);
+	uint32 idx 	= regs[E1000_TDT];
+	struct tx_desc *tx_desc_ins= &tx_ring[idx];
+	if (!(tx_desc_ins->status & E1000_TXD_STAT_DD)) {
+		printf("previous transmission request not finished\n");
+		return -1;
+	}
+	if (tx_desc_ins->addr)
+		kfree((void *)tx_desc_ins->addr);
+	
+	tx_desc_ins->addr 	= (uint64)buf;
+	tx_desc_ins->length = (uint16)len;
+	tx_desc_ins->cmd 		= E1000_TXD_CMD_EOP | E1000_TXD_CMD_RS;
+
+	tx_bufs[idx] = buf;
+
+	uint32 cur = regs[E1000_TDT];
+	regs[E1000_TDT] = (cur + 1) % TX_RING_SIZE;
+
+	//release(&e1000_lock);
   return 0;
 }
 
@@ -115,7 +134,20 @@ e1000_recv(void)
   // Check for packets that have arrived from the e1000
   // Create and deliver a buf for each packet (using net_rx()).
   //
+	while(1) {
+		uint32 idx = (regs[E1000_RDT] + 1) % RX_RING_SIZE;
 
+		struct rx_desc *rx_desc_ins = &rx_ring[idx];	
+		if (!(rx_desc_ins->status & E1000_RXD_STAT_DD)) {
+			return ;
+		}
+
+		net_rx((char *)rx_desc_ins->addr, (int)rx_desc_ins->length);
+		rx_bufs[idx] 				= kalloc();
+		rx_desc_ins->addr 	= (uint64)rx_bufs[idx];
+		rx_desc_ins->status = 0;
+		regs[E1000_RDT] = idx;
+	}
 }
 
 void
