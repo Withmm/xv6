@@ -84,7 +84,6 @@ static void testsymlink(void)
 
 	if (write(fd1, buf, sizeof(buf)) != 4)
 		fail("failed to write to a");
-
 	if (stat_slink("/testsymlink/b", &st) != 0)
 		fail("failed to stat b");
 	if (st.type != T_SYMLINK)
