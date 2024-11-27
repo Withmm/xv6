@@ -235,3 +235,5 @@ void netinit(void);
 void net_rx(char *buf, int len);
 
 #endif
+
+void writeback(struct file *f, uint64 addr, int foff, int n, int limit);

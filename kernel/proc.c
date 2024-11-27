@@ -386,36 +386,11 @@ void exit(int status)
                                 int foff = v->addr - v->start;
                                 int max = ((MAXOPBLOCKS - 1 - 1 - 2) / 2) * BSIZE;
                                 int n = MIN(v->length, (v->f->ip->size - foff));
-                                int i = 0;
-                                int r = 0;
-                                while (i < n) {
-                                        int n1 = n - i;
-                                        if (n1 > max)
-                                                n1 = max;
-
-                                        begin_op();
-                                        ilock(v->f->ip);
-                                        if ((r = writei(v->f->ip, 1, v->addr + i, foff, n1)) > 0)
-                                                foff += r;
-                                        iunlock(v->f->ip);
-                                        end_op();
-
-                                        if (r != n1) {
-                                                // error from writei
-                                                break;
-                                        }
-                                        i += r;
-                                }
+				writeback(v->f, v->addr, foff, n, max);
                         }
 			fileclose(v->f);
-			//check this	
-			/*
-				if we have vma, but we don't real access it,
-				we really don't have mappages, cause mappages
-				happened in pagefault...
-			*/
 			uvmunmap(p->pagetable, v->addr, v->length / 4096, 1);	
-			memset(v, 0, sizeof(struct vma));	
+			memset(v, 0, sizeof(*v));
 		}
 	}
 	// Close all open files.

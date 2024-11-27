@@ -93,13 +93,14 @@ void usertrap(void)
 		syscall();
 	} else if ((which_dev = devintr()) != 0) {
 		// ok
-	} else if (r_scause() == 0xd || r_scause() == 0xf) {
+	} else if (r_scause() == 0xd ||
+		   r_scause() == 0xf) { //read pagefault and write pagefault
 		uint64 va = r_stval();
 		if (va >= p->sz || va > MAXVA ||
 		    PGROUNDUP(va) == PGROUNDDOWN(p->trapframe->sp))
 			setkilled(p);
 		else {
-			struct vma *vma = 0;
+			struct vma *vma = (struct vma *)0;
 			for (int i = 0; i < NVMA; i++) {
 				if (p->vmas[i].prot != PROT_NONE &&
 				    va >= p->vmas[i].addr &&
@@ -108,7 +109,7 @@ void usertrap(void)
 					break;
 				}
 			}
-			if (vma) {
+			if (vma) { // mmaped
 				va = PGROUNDDOWN(va);
 				uint64 offset = va - vma->addr;
 				uint64 mem = (uint64)kalloc();
@@ -117,8 +118,9 @@ void usertrap(void)
 				} else {
 					memset((void *)mem, 0, PGSIZE);
 					ilock(vma->f->ip);
-					readi(vma->f->ip, 0, mem, offset,
-					      PGSIZE);
+					if (readi(vma->f->ip, 0, mem, offset,
+						  PGSIZE) < 0)
+						setkilled(p);
 					iunlock(vma->f->ip);
 					int flag = PTE_U;
 					if (vma->prot & PROT_READ)
@@ -127,7 +129,9 @@ void usertrap(void)
 						flag |= PTE_W;
 					if (vma->prot & PROT_EXEC)
 						flag |= PTE_X;
-					if (r_scause() == 15 && !(vma->prot & PROT_WRITE)) {
+					// cannot write a readonly page
+					if (r_scause() == 15 &&
+					    !(vma->prot & PROT_WRITE)) {
 						kfree((void *)mem);
 						setkilled(p);
 					}
@@ -137,7 +141,7 @@ void usertrap(void)
 						setkilled(p);
 					}
 				}
-			} else {  // not mmaped
+			} else { // not mmaped
 				setkilled(p);
 			}
 		}

@@ -518,14 +518,14 @@ uint64 sys_mmap(void)
 	for (int i = 0; i < NVMA; i++) {
 		struct vma *vma = &p->vmas[i];
 		if (vma->prot == PROT_NONE) { // found unused vma
-			vma->addr 	= p->sz;
-			vma->length 	= (length + 4096 - 1) / 4096 * 4096;
-			vma->prot 	= prot;
-			vma->flags 	= flags;
-			vma->f 		= f;
-			vma->start	= vma->addr;
+			vma->addr = p->sz;
+			vma->length = PGROUNDUP(length);
+			vma->prot = prot;
+			vma->flags = flags;
+			vma->f = f;
+			vma->start = vma->addr;
 			//printf("mmap: address = %p\n", (void *)addr);
-			p->sz 		+= vma->length;
+			p->sz += vma->length;
 			return vma->addr;
 		}
 	}
@@ -539,62 +539,59 @@ uint64 sys_munmap(void)
 	int length;
 	argaddr(0, &addr);
 	argint(1, &length);
-	length = (length + 4096 - 1) / 4096 * 4096;
-	//printf("sys_munmap: addr = %lx, length = %d\n", addr, length);
+	length = PGROUNDUP(length);
 	struct proc *p = myproc();
 	for (int i = 0; i < NVMA; i++) {
 		struct vma *v = &p->vmas[i];
-		if (v->prot != PROT_NONE && (v->addr <= addr && addr < v->addr + v->length)) {
+		if (v->prot != PROT_NONE &&
+		    (v->addr <= addr && addr < v->addr + v->length)) {
 			//printf("file size = %d\n", v->f->ip->size);
 			if ((v->flags & MAP_SHARED) && (v->prot & PROT_WRITE)) {
+				int max =
+					((MAXOPBLOCKS - 1 - 1 - 2) / 2) * BSIZE;
 				int foff = addr - v->start;
-				int max = ((MAXOPBLOCKS - 1 - 1 - 2) / 2) * BSIZE;
-				int n = MIN(length, (v->f->ip->size - foff));	
-				int i = 0;
-				int r = 0;
-				//printf("begin write: addr = %p length = %d off = %d\n", (void *)addr, n, foff);
-				while (i < n) {
-					int n1 = n - i;
-					if (n1 > max)
-						n1 = max;
-					begin_op();
-					ilock(v->f->ip);
-					//printf("real write: addr = %p, off = %d length = %d\n", (void *)(addr + i), foff, n1);
-					if ((r = writei(v->f->ip, 1, addr + i, foff, n1)) > 0)
-						foff += r;
-					iunlock(v->f->ip);
-					end_op();
-					if (r != n1) {
-						// error from writei
-						break;
-					}
-					//printf("hello\n");
-					i += r;
-				}
+				writeback(v->f, addr, foff,
+					  MIN(length, (v->f->ip->size - foff)),
+					  max);
 			}
-			uvmunmap(p->pagetable, addr, length/4096, 1);
-			if (addr == v->addr) {
-				v->length -= length;
-				v->addr += length;
+			uvmunmap(p->pagetable, addr, length / PGSIZE, 1);
+			v->length -= length;
+			if (v->length == 0) {
+				fileclose(v->f);
+				memset(v, 0, sizeof(*v));
 				return 0;
-				if (v->length == 0){
-					fileclose(v->f);
-					memset(v, 0, sizeof(struct vma));
-					return 0;	
-				}
+			}
+			if (addr == v->addr) {
+				v->addr += length;
 			}
 			if (addr + length == v->addr + v->length) {
-				v->length -= length;
-				return 0;
-				if (v->length == 0) {
-					fileclose(v->f);
-					memset(v, 0, sizeof(struct vma));
-					return 0;
-				}
+				printf("unexpected munmap args\n.");
+				return -1;
 			}
-			printf("unexpected munmap args\n.");
-			return -1;
 		}
 	}
 	return 0;
+}
+// referring filewrite
+void writeback(struct file *f, uint64 addr, int foff, int n, int limit)
+{
+	int i = 0;
+	int r = 0;
+	while (i < n) {
+		int n1 = n - i;
+		if (n1 > limit)
+			n1 = limit;
+		begin_op();
+		ilock(f->ip);
+		if ((r = writei(f->ip, 1, addr + i, foff, n1)) > 0)
+			foff += r;
+		iunlock(f->ip);
+		end_op();
+		if (r != n1) {
+			// error from writei
+			break;
+		}
+		//printf("hello\n");
+		i += r;
+	}
 }
