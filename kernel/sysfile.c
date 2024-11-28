@@ -564,10 +564,6 @@ uint64 sys_munmap(void)
 			if (addr == v->addr) {
 				v->addr += length;
 			}
-			if (addr + length == v->addr + v->length) {
-				printf("unexpected munmap args\n.");
-				return -1;
-			}
 		}
 	}
 	return 0;
